@@ -5,11 +5,13 @@ class OBJ:
         self.normals = []
         self.texcoords = []
         self.faces = []
-        material = None
+        material = None  # noqa: F841
         for line in open(filename, "r"):
-            if line.startswith('#'): continue
+            if line.startswith('#'): 
+                continue
             values = line.split()
-            if not values: continue
+            if not values: 
+                continue
             if values[0] == 'v':
                 v = list(map(float, values[1:4]))
                 if swapyz:

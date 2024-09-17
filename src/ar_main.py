@@ -13,11 +13,11 @@ import cv2
 import numpy as np
 import math
 import os
-from objloader_simple import *
+from objloader_simple import *  # noqa: F403
 
 # Minimum number of matches that have to be found
 # to consider the recognition valid
-MIN_MATCHES = 10
+MIN_MATCHES = 100
 DEFAULT_COLOR = (0, 0, 0)
 
 
@@ -29,16 +29,18 @@ def main():
     # matrix of camera parameters (made up but works quite well for me) 
     camera_parameters = np.array([[800, 0, 320], [0, 800, 240], [0, 0, 1]])
     # create ORB keypoint detector
-    orb = cv2.ORB_create()
+    #orb = cv2.ORB_create()
+    sift = cv2.SIFT_create()
     # create BFMatcher object based on hamming distance  
-    bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+    bf = cv2.BFMatcher(cv2.NORM_L2, crossCheck=True)
     # load the reference surface that will be searched in the video stream
     dir_name = os.getcwd()
     model = cv2.imread(os.path.join(dir_name, 'reference/model.jpg'), 0)
     # Compute model keypoints and its descriptors
-    kp_model, des_model = orb.detectAndCompute(model, None)
+    kp_model, des_model = sift.detectAndCompute(model, None)
+
     # Load 3D model from OBJ file
-    obj = OBJ(os.path.join(dir_name, 'models/fox.obj'), swapyz=True)  
+    obj = OBJ(os.path.join(dir_name, 'models/fox.obj'), swapyz=True)  # noqa: F405
     # init video capture
     cap = cv2.VideoCapture(0)
 
@@ -49,7 +51,7 @@ def main():
             print("Unable to capture video")
             return 
         # find and draw the keypoints of the frame
-        kp_frame, des_frame = orb.detectAndCompute(frame, None)
+        kp_frame, des_frame = sift.detectAndCompute(frame, None)
         # match frame descriptors with model descriptors
         matches = bf.match(des_model, des_frame)
         # sort them in the order of their distance
@@ -63,7 +65,7 @@ def main():
             dst_pts = np.float32([kp_frame[m.trainIdx].pt for m in matches]).reshape(-1, 1, 2)
             # compute Homography
             homography, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
-            if args.rectangle:
+            if show_rectangle:
                 # Draw a rectangle that marks the found model in the frame
                 h, w = model.shape
                 pts = np.float32([[0, 0], [0, h - 1], [w - 1, h - 1], [w - 1, 0]]).reshape(-1, 1, 2)
@@ -79,18 +81,18 @@ def main():
                     # project cube or model
                     frame = render(frame, obj, projection, model, False)
                     #frame = render(frame, model, projection)
-                except:
+                except:  # noqa: E722
                     pass
             # draw first 10 matches.
-            if args.matches:
+            if show_matches:
                 frame = cv2.drawMatches(model, kp_model, frame, kp_frame, matches[:10], 0, flags=2)
-            # show result
-            cv2.imshow('frame', frame)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-
         else:
             print("Not enough matches found - %d/%d" % (len(matches), MIN_MATCHES))
+
+        # show result
+        cv2.imshow('frame', frame)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
 
     cap.release()
     cv2.destroyAllWindows()
@@ -134,10 +136,10 @@ def projection_matrix(camera_parameters, homography):
     col_2 = rot_and_transl[:, 1]
     col_3 = rot_and_transl[:, 2]
     # normalise vectors
-    l = math.sqrt(np.linalg.norm(col_1, 2) * np.linalg.norm(col_2, 2))
-    rot_1 = col_1 / l
-    rot_2 = col_2 / l
-    translation = col_3 / l
+    length = math.sqrt(np.linalg.norm(col_1, 2) * np.linalg.norm(col_2, 2))
+    rot_1 = col_1 / length
+    rot_2 = col_2 / length
+    translation = col_3 / length
     # compute the orthonormal basis
     c = rot_1 + rot_2
     p = np.cross(rot_1, rot_2)
@@ -170,6 +172,9 @@ parser.add_argument('-ma','--matches', help = 'draw matches between keypoints', 
 #parser.add_argument('-mo','--model', help = 'Specify model to be projected', action = 'store_true')
 
 args = parser.parse_args()
+
+show_rectangle = True
+show_matches = True
 
 if __name__ == '__main__':
     main()
